@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Palmera Bay — Open World Crime Game</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0b1c2c;
+    font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif; color: #fff; }
+  #app { position: fixed; inset: 0; }
+  #app canvas { display: block; }
+  .hidden { display: none !important; }
+  /* ---------- HUD ---------- */
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+  #top-left { position: absolute; top: 14px; left: 14px; }
+  #money { font-size: 26px; font-weight: 800; color: #7dff9b; text-shadow: 0 2px 4px rgba(0,0,0,.7); letter-spacing: .5px; }
+  #stars { font-size: 26px; letter-spacing: 3px; margin-top: 2px; text-shadow: 0 2px 4px rgba(0,0,0,.8); }
+  #stars .on { color: #ffd21f; } #stars .off { color: rgba(255,255,255,.28); }
+  #health-wrap { margin-top: 8px; width: 220px; }
+  #health-label { font-size: 11px; font-weight: 700; letter-spacing: 2px; color: #e8f4ff; text-shadow: 0 1px 3px rgba(0,0,0,.8); }
+  #health-bar { height: 12px; background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.5); border-radius: 6px; overflow: hidden; margin-top: 2px; }
+  #health-fill { height: 100%; width: 100%; background: linear-gradient(90deg,#37d67a,#a5f3c0); transition: width .2s; }
+  #health-fill.low { background: linear-gradient(90deg,#e33,#ff9a9a); }
+  #mission-box { margin-top: 10px; max-width: 340px; background: rgba(8,24,40,.62); border-left: 4px solid #ffb020;
+    padding: 8px 10px; border-radius: 0 8px 8px 0; }
+  #mission-title { font-size: 13px; font-weight: 800; color: #ffd21f; letter-spacing: .5px; }
+  #objective { font-size: 13px; color: #eaf6ff; margin-top: 2px; line-height: 1.35; }
+  #timer { font-size: 20px; font-weight: 800; color: #fff; margin-top: 4px; }
+  #timer.urgent { color: #ff5b5b; }
+  #top-right { position: absolute; top: 14px; right: 14px; text-align: right; }
+  #minimap { width: 200px; height: 200px; border: 2px solid rgba(255,255,255,.65); border-radius: 10px;
+    background: #12324a; box-shadow: 0 4px 14px rgba(0,0,0,.5); }
+  #speed { margin-top: 6px; font-size: 24px; font-weight: 800; color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,.8); }
+  #speed small { font-size: 12px; font-weight: 600; color: #cfe8ff; }
+  #car-health { font-size: 13px; font-weight: 700; color: #ffd9a0; text-shadow: 0 1px 3px rgba(0,0,0,.8); }
+  #controls-hint { position: absolute; left: 14px; bottom: 12px; font-size: 12px; line-height: 1.55;
+    color: #dcefff; background: rgba(8,24,40,.55); padding: 8px 10px; border-radius: 8px; }
+  #feed { position: absolute; right: 14px; bottom: 12px; width: 320px; text-align: right; }
+  .feed-msg { font-size: 13px; font-weight: 600; color: #fff; background: rgba(8,24,40,.66);
+    border-radius: 6px; padding: 6px 9px; margin-top: 6px; display: inline-block; text-align: left;
+    animation: feedin .25s ease-out; }
+  @keyframes feedin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  #dialogue { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); width: 560px; max-width: 86vw;
+    background: rgba(6,20,34,.82); border: 1px solid rgba(255,255,255,.35); border-radius: 12px; padding: 12px 16px; }
+  #dlg-speaker { font-size: 13px; font-weight: 800; color: #ffb020; letter-spacing: 1px; }
+  #dlg-text { font-size: 15px; line-height: 1.45; margin-top: 3px; color: #f2f9ff; }
+  #marker-arrow { position: absolute; left: 50%; top: 50%; width: 0; height: 0; margin-left: -18px; margin-top: -18px;
+    font-size: 30px; color: #ffd21f; text-shadow: 0 0 8px rgba(0,0,0,.9); text-align: center; line-height: 36px; }
+  #toast { position: absolute; left: 50%; top: 22%; transform: translateX(-50%); text-align: center;
+    animation: toastpop .3s ease-out; }
+  @keyframes toastpop { from { opacity: 0; transform: translateX(-50%) scale(.85); } to { opacity: 1; transform: translateX(-50%) scale(1); } }
+  #toast-title { font-size: 34px; font-weight: 900; color: #ffd21f; text-shadow: 0 3px 10px rgba(0,0,0,.8); letter-spacing: 1px; }
+  #toast-sub { font-size: 18px; font-weight: 700; color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,.8); margin-top: 4px; }
+  /* ---------- Overlays ---------- */
+  .overlay { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(160deg, rgba(6,28,48,.88), rgba(20,60,90,.82)); }
+  .panel { text-align: center; max-width: 640px; padding: 30px 34px; }
+  .game-title { font-size: 64px; font-weight: 900; letter-spacing: 4px; line-height: 1;
+    background: linear-gradient(180deg,#fff6c9,#ffb020 55%,#ff7a3c); -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; filter: drop-shadow(0 4px 10px rgba(0,0,0,.6)); }
+  .game-sub { font-size: 17px; font-weight: 700; color: #9fdcff; letter-spacing: 6px; margin-top: 8px; }
+  .story { font-size: 15px; line-height: 1.6; color: #e8f4ff; margin: 18px auto 6px; max-width: 540px; text-align: left; }
+  .story b { color: #ffd21f; }
+  .btn { pointer-events: auto; cursor: pointer; display: inline-block; margin-top: 18px; padding: 14px 44px;
+    font-size: 20px; font-weight: 800; letter-spacing: 2px; color: #122; background: linear-gradient(180deg,#ffe066,#ffb020);
+    border: none; border-radius: 12px; box-shadow: 0 6px 18px rgba(0,0,0,.45); }
+  .btn:hover { filter: brightness(1.1); }
+  .btn.ghost { background: rgba(255,255,255,.14); color: #fff; border: 1px solid rgba(255,255,255,.5); font-size: 15px; padding: 10px 26px; }
+  .controls-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 26px; text-align: left; font-size: 13.5px;
+    color: #d8ecff; margin: 16px auto 0; max-width: 520px; line-height: 1.5; }
+  .controls-grid b { color: #ffd21f; }
+  .save-line { margin-top: 14px; font-size: 13px; color: #a9d6f5; }
+  .big-end { font-size: 72px; font-weight: 900; letter-spacing: 6px; }
+  .big-end.busted { color: #6db3ff; text-shadow: 0 0 24px rgba(80,140,255,.8); }
+  .big-end.wasted { color: #ff5b5b; text-shadow: 0 0 24px rgba(255,60,60,.8); }
+  .big-end.win { color: #ffd21f; text-shadow: 0 0 24px rgba(255,200,40,.8); }
+  .end-sub { font-size: 16px; color: #e8f4ff; margin-top: 10px; line-height: 1.6; }
+  .stat-line { font-size: 14px; color: #cfe8ff; margin-top: 12px; line-height: 1.7; }
+  .stat-line b { color: #ffd21f; }
+  #mute-note { position: fixed; right: 12px; bottom: 8px; z-index: 6; font-size: 11px; color: rgba(255,255,255,.55); }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="hud" class="hidden">
+  <div id="top-left">
+    <div id="money">$0</div>
+    <div id="stars"></div>
+    <div id="health-wrap">
+      <div id="health-label">HEALTH</div>
+      <div id="health-bar"><div id="health-fill"></div></div>
+    </div>
+    <div id="mission-box">
+      <div id="mission-title">FREE ROAM</div>
+      <div id="objective">Explore Palmera Bay. Talk to Marisol to start a job.</div>
+      <div id="timer" class="hidden"></div>
+    </div>
+  </div>
+  <div id="top-right">
+    <canvas id="minimap" width="200" height="200"></canvas>
+    <div id="speed" class="hidden">0 <small>km/h</small></div>
+    <div id="car-health" class="hidden"></div>
+  </div>
+  <div id="marker-arrow" class="hidden">&#9650;</div>
+  <div id="controls-hint">
+    <b>WASD</b> move &nbsp; <b>Mouse drag</b> camera &nbsp; <b>Shift</b> run<br>
+    <b>Space</b> jump &nbsp; <b>E</b> enter / exit car &nbsp; <b>F</b> / click attack<br>
+    <b>W/S</b> drive &nbsp; <b>A/D</b> steer &nbsp; <b>P</b> pause &nbsp; <b>M</b> mute
+  </div>
+  <div id="feed"></div>
+  <div id="dialogue" class="hidden">
+    <div id="dlg-speaker">MARISOL</div>
+    <div id="dlg-text"></div>
+  </div>
+  <div id="toast" class="hidden">
+    <div id="toast-title"></div>
+    <div id="toast-sub"></div>
+  </div>
+</div>
+
+<div id="menu" class="overlay">
+  <div class="panel">
+    <div class="game-title">PALMERA BAY</div>
+    <div class="game-sub">SUN &middot; SPEED &middot; TROUBLE</div>
+    <div class="story">
+      You are <b>Danny Reyes</b>, a young driver fresh off the bus in Palmera Bay — a sun-soaked coastal city
+      of glass towers, palm-lined boulevards and one very long beach. You are broke, but the fixer
+      <b>Marisol Vega</b> has work for anyone with fast hands and a faster car.
+      Run her jobs, dodge the Palmera Bay police, and earn enough to make this city yours.
+    </div>
+    <button id="play-btn" class="btn">PLAY</button>
+    <div id="save-line" class="save-line"></div>
+    <div class="controls-grid">
+      <div><b>W A S D</b> — move / drive</div><div><b>Mouse drag</b> — orbit camera</div>
+      <div><b>Shift</b> — run</div><div><b>Space</b> — jump</div>
+      <div><b>E</b> — enter / exit car</div><div><b>F / Click</b> — punch</div>
+      <div><b>P / Esc</b> — pause</div><div><b>M</b> — mute sound</div>
+    </div>
+    <div class="save-line">Progress saves automatically. Steal cars, lose the cops, finish all five jobs.</div>
+  </div>
+</div>
+
+<div id="pause" class="overlay hidden">
+  <div class="panel">
+    <div class="game-title" style="font-size:44px">PAUSED</div>
+    <div class="end-sub">Palmera Bay waits for no one. Well — except right now.</div>
+    <button id="resume-btn" class="btn">RESUME</button><br>
+    <button id="restart-btn" class="btn ghost">RESTART MISSION</button>
+    <button id="menu-btn" class="btn ghost">MAIN MENU</button>
+  </div>
+</div>
+
+<div id="end" class="overlay hidden">
+  <div class="panel">
+    <div id="end-title" class="big-end busted">BUSTED</div>
+    <div id="end-sub" class="end-sub"></div>
+    <div id="end-stats" class="stat-line"></div>
+    <button id="end-btn" class="btn">TRY AGAIN</button>
+    <div class="save-line">Press R to restart</div>
+  </div>
+</div>
+
+<div id="mute-note">M — mute &nbsp;|&nbsp; Palmera Bay — an original open-world crime game</div>
+
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js" } }
+</script>
+<script type="module" src="./js/main.js"></script>
+</body>
+</html>
